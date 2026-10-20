@@ -59,7 +59,7 @@ const SETUP = {
   //   'NONE'              … 共有しない（作成者のみ）
   //   'DOMAIN_WITH_LINK'  … 組織内でリンクを知っている人が閲覧
   //   'ANYONE_WITH_LINK'  … リンクを知っている全員が閲覧
-  STUDENT_SHARING: 'NONE',
+  STUDENT_SHARING: 'ANYONE_WITH_LINK',
 
   // ===== フォームの質問見出し・選択肢・シート名 =====
   // 下の値は、出力する CONFIG にも書き込まれるので、フォームと本体は必ず一致する。

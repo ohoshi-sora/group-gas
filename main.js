@@ -265,13 +265,18 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('自動化メニュー')
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('①初期設定')
-        .addItem('必要シートを作成/更新', 'initializeManagedSheets')
-        .addItem('派生シートのみ初期化', 'resetDerivedSheets')
-        .addItem('全データ初期化（クール申請のみ回答削除）', 'resetAllData')
+      SpreadsheetApp.getUi().createMenu('①フォーム送信')
+        .addItem('送信トリガーを有効化⭐️', 'enableOnSubmitTrigger')
+        .addItem('送信トリガーを無効化', 'disableOnSubmitTriggers')
     )
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('②初回パスワード送信')
+      SpreadsheetApp.getUi().createMenu('②週次スケジュール')
+        .addItem('週次スケジュール登録⭐️', 'createWeeklyAutomation')
+        .addItem('週次スケジュール解除', 'cancelWeeklyAutomation')
+        .addItem('登録状況を表示', 'showWeeklyAutomationStatus')
+    )
+    .addSubMenu(
+      SpreadsheetApp.getUi().createMenu('③初回パスワード送信')
         .addItem('名簿シートを準備', 'prepareInitialPasswordSheet')
         .addItem('分割送信を開始（次回分を予約）⭐️', 'startInitialPasswordDistribution')
         .addItem('今すぐ1回分を送信', 'sendInitialPasswordsNow')
@@ -279,22 +284,11 @@ function onOpen() {
         .addItem('分割送信を中止', 'cancelInitialPasswordDistribution')
     )
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('③フォーム送信')
-        .addItem('送信トリガーを有効化⭐️', 'enableOnSubmitTrigger')
-        .addItem('送信トリガーを無効化', 'disableOnSubmitTriggers')
-    )
-    .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('④週次スケジュール')
-        .addItem('週次スケジュール登録⭐️', 'createWeeklyAutomation')
-        .addItem('週次スケジュール解除', 'cancelWeeklyAutomation')
-        .addItem('登録状況を表示', 'showWeeklyAutomationStatus')
-    )
-    .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('⑤クール分け')
+      SpreadsheetApp.getUi().createMenu('④クール分け')
         .addItem('今すぐクール分け・BCを更新', 'updateRostersNow')
     )
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('⑥グループ分け')
+      SpreadsheetApp.getUi().createMenu('⑤グループ分け')
         .addItem('確認修正用グループを生成', 'makeRandomGroups')
         .addItem('今すぐ学生に公開', 'publishGroupsNow')
         .addItem('公開予約（設定値より自動設定）', 'scheduleGroupPublishFromConfig')
@@ -302,7 +296,7 @@ function onOpen() {
         .addItem('公開予約を取消', 'cancelGroupPublishSchedule')
     )
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('⑦フォーム受付')
+      SpreadsheetApp.getUi().createMenu('⑥フォーム受付')
         .addItem('受付開始/締切を手動予約', 'promptScheduleFormsWindow')
         .addItem('受付予約状況を表示', 'showFormWindowSchedule')
         .addItem('クール申請フォームを今すぐ開く', 'openCoolFormNow')
@@ -312,11 +306,17 @@ function onOpen() {
         .addItem('フォーム予約をすべて取消', 'cancelAllFormSchedules')
     )
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('⑧当日申請')
+      SpreadsheetApp.getUi().createMenu('⑦当日申請')
         .addItem('当日申請シートを準備', 'prepareSameDayApplicationsSheet')
         .addItem('当日申請を空き枠へ反映⭐️ 1', 'applySameDayApplicationsNow')
         .addItem('今すぐ学生に公開⭐️ 2', 'publishGroupsNow')
     )
+    .addSubMenu(
+      SpreadsheetApp.getUi().createMenu('⑧その他')
+        .addItem('必要シートを作成/更新（手作業で作る場合）', 'initializeManagedSheets')
+        .addItem('全データ初期化（クール申請のみ回答削除）', 'resetAllData')
+    )
+
     .addToUi();
 }
 
@@ -2157,7 +2157,7 @@ function deleteAllTimeBasedTriggers_() {
   // 初回パスワード送信（sendInitialPasswordsScheduled）は週次スケジュールとは
   // 独立して管理する。createWeeklyAutomation が内部で cancelWeeklyAutomation を
   // 呼ぶため、ここに含めると初回配布中に週次登録し直すとトリガーが消えてしまう。
-  // 解除は「⑧初回パスワード送信 → 分割送信を中止」で行う。
+  // 解除は「③初回パスワード送信 → 分割送信を中止」で行う。
   const targetFunctions = [
     'openCoolFormTriggerSafe',
     'closeCoolFormTriggerSafe',

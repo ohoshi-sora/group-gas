@@ -20,7 +20,7 @@ const SETUP = {
   // （各 ID は自動で書かれるので、ここには書かない）
   OVERRIDES: {
     TOTAL_COOLS: 3,        // クール数（3 または 4）
-    TEAMS_PER_COHORT: 7,   // 1クールのチーム数
+    TEAMS_PER_COHORT: 20,   // 1クールのチーム数
     MEMBERS_PER_TEAM: 4,   // 1チームの人数（最大）。1クールの定員 = チーム数 × 人数
     MAIL_DOMAIN: '@example.ac.jp', // パスワードの送信先は「学籍番号 + この値」。必ず変更する
 

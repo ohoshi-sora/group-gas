@@ -609,7 +609,7 @@ function deepMerge_(base, extra) {
  *  本体の CONFIG のキー・既定値・コメントを変えたときは、ここも同じに直すこと。
  *  直し忘れると、出力したコードを貼り付けたときに、本体側の変更が失われる。
  *************************************************/
-const CONFIG_TEMPLATE_VERSION = 1;
+const CONFIG_TEMPLATE_VERSION = 2;
 
 // 出力順もこの順（ADMIN_SPREADSHEET_ID は、式をそのまま出力する）
 const CONFIG_DEFAULTS = {
@@ -639,8 +639,8 @@ const CONFIG_DEFAULTS = {
     ALLOW_NO_NAME: true,
     SEND_SCHEDULE: [
       { at: '2026/09/29 12:00' },
-      { at: '2026/09/30 12:00' },
-      { at: '2026/10/01 12:00' }
+      { at: '2026/09/30 12:05' },
+      { at: '2026/10/01 12:10' }
     ]
   },
   SHEETS: {
@@ -735,7 +735,7 @@ const CONFIG_NOTES = {
   'INITIAL_PASSWORD_SETTINGS.SKIP_ALREADY_ISSUED': { after: '// マスタで発行済み（発行回数≥1）の学生を対象外にする' },
   'INITIAL_PASSWORD_SETTINGS.ALLOW_NO_NAME': { after: '// 氏名が空でも学籍番号だけで送信する' },
   'INITIAL_PASSWORD_SETTINGS.SEND_SCHEDULE': {
-    before: ['', '// JST。先頭から順に使い、毎回「次回分だけ」トリガーを1個予約する。', '// count 省略時は BATCH_SIZE 件。開始時点で過去の日時は自動スキップ。', "// batchを効かせたい時の例   { at: '2026/09/28 02:40', count: 5 }"]
+    before: ['', '// JST。先頭から順に使い、毎回「次回分だけ」トリガーを1個予約する。', '// count 省略時は BATCH_SIZE 件。開始時点で過去の日時は自動スキップ。', '// メール送信枠は、最初に送った時刻から24時間後にリセットされる（0時ではない）。', '// 前日と同じ時刻だと枠が戻りきらないことがあるため、日ごとに5分ずつ遅らせて入れる。', "// batchを効かせたい時の例   { at: '2026/09/28 02:40', count: 5 }"]
   },
   'SHEETS': {
     before: ['', '// ===== API設定 =====', "// PASSWORD_API_URL: '',", '', '// ===== フォーム回答シート名 =====']

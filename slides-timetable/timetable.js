@@ -16,10 +16,11 @@ const CONFIG = {
   BREAK_MIN: 5,
 
   // クール数。表は1行目が全体説明、2行目から COOL_COUNT 行がクール。group-assign の TOTAL_COOLS と合わせる
+  // 表の行数が合わなければ、書き込む前に行を足す・消す（表の位置や大きさは自動では変わらない）
   COOL_COUNT: 3,
   // 1クールのグループ数。グループ番号は第1クールが 1〜この数、第2クールがその続きになる（7 なら 1~7、8~14…）
   // group-assign の TEAMS_PER_COHORT と合わせる
-  TEAMS_PER_COHORT: 7
+  TEAMS_PER_COHORT: 8
 };
 
 // メニューで入力した時間の保存先（スライドファイルごとに保存される）
@@ -134,6 +135,7 @@ function updateTableContent() {
   }
 
   const table = tables[CONFIG.TABLE_INDEX];
+  adjustTableRows(table);
 
   const durations = getSavedDurations();
   const ovDur = durations.overviewMin;
@@ -153,9 +155,25 @@ function updateTableContent() {
 
     updateTableCell(table, i + 1, 0, buildCoolLabel(i + 1));
     updateTableCell(table, i + 1, 1, formatTime(currentTime));
+    fillTableCellIfEmpty(table, i + 1, 2, "~");
     updateTableCell(table, i + 1, 3, formatTime(endTime));
 
     currentTime = addMinutes(endTime, CONFIG.BREAK_MIN);
+  }
+}
+
+/**
+ * 表の行数を「全体説明 1 行 + COOL_COUNT 行」に合わせる
+ * 足りなければ最後の行の下に足し、多ければ末尾から消す（行の高さや表の位置は変えない）
+ */
+function adjustTableRows(table) {
+  const needed = CONFIG.COOL_COUNT + 1;
+
+  while (table.getNumRows() < needed) {
+    table.appendRow();
+  }
+  while (table.getNumRows() > needed) {
+    table.getRow(table.getNumRows() - 1).remove();
   }
 }
 
@@ -174,6 +192,14 @@ function buildCoolLabel(coolNo) {
  */
 function updateTableCell(table, row, col, text) {
   table.getCell(row, col).getText().setText(text);
+}
+
+/**
+ * セルが空のときだけ書き込む（行を足したときの「~」用。既存の文言は変えない）
+ */
+function fillTableCellIfEmpty(table, row, col, text) {
+  const cellText = table.getCell(row, col).getText();
+  if (cellText.asString().trim() === "") cellText.setText(text);
 }
 
 /**

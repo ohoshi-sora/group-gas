@@ -42,7 +42,7 @@
 
 ## サンプルと説明資料
 
-[Google ドライブの共有フォルダ](https://drive.google.com/drive/folders/1cF2oNx4IjU_U7E9-nIFzv8FAE1Ykyjvm?usp=sharing)に、次のものを置いています。
+[Google ドライブの共有フォルダ](https://drive.google.com/drive/folders/1HNb5SVgiMj7ytrR_FyToBHNUVFqfU6P-?usp=sharing)に、次のものを置いています。
 
 - 例となるフォームとスプレッドシート。作られるものの見た目は、セットアップの前に確認できます。
 - 仕組みを説明するスライド。

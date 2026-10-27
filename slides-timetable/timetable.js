@@ -1,0 +1,175 @@
+/**
+ * 全体設定
+ */
+const CONFIG = {
+  SLIDE_INDEX: 1,
+  TABLE_INDEX: 0,
+  START_TIME: "9:00",
+  DEFAULT_OVERVIEW_MIN: 40,
+  SESSION_MIN: 30,
+  BREAK_MIN: 5,
+  COOL_COUNT: 3
+};
+
+const PROP_KEYS = {
+  OVERVIEW_MIN: "overview_min",
+  SESSION_MIN: "session_min"
+};
+
+function onOpen() {
+  SlidesApp.getUi()
+    .createMenu('スライド操作')
+    .addItem('全体説明時間を更新', 'promptUpdateOverviewDuration')
+    .addItem('各クール時間を更新', 'promptUpdateSessionDuration')
+    .addItem('初期値に戻す', 'resetDurations')
+    .addToUi();
+}
+
+/**
+ * 保存済み設定を取得
+ */
+function getSavedDurations() {
+  const props = PropertiesService.getDocumentProperties();
+
+  return {
+    overviewMin: Number(props.getProperty(PROP_KEYS.OVERVIEW_MIN)) || CONFIG.DEFAULT_OVERVIEW_MIN,
+    sessionMin: Number(props.getProperty(PROP_KEYS.SESSION_MIN)) || CONFIG.SESSION_MIN
+  };
+}
+
+/**
+ * 全体説明時間を更新
+ */
+function promptUpdateOverviewDuration() {
+  const ui = SlidesApp.getUi();
+  const res = ui.prompt(
+    '全体説明時間の更新',
+    '全体説明の時間（分）を入力してください:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+
+  const duration = Number(res.getResponseText().trim());
+
+  if (!Number.isInteger(duration) || duration <= 0) {
+    ui.alert('正の整数を入力してください。');
+    return;
+  }
+
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty(PROP_KEYS.OVERVIEW_MIN, String(duration));
+
+  updateTableContent();
+}
+
+/**
+ * 各クール時間を更新
+ */
+function promptUpdateSessionDuration() {
+  const ui = SlidesApp.getUi();
+  const res = ui.prompt(
+    '各クール時間の更新',
+    '各クールの時間（分）を入力してください:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+
+  const duration = Number(res.getResponseText().trim());
+
+  if (!Number.isInteger(duration) || duration <= 0) {
+    ui.alert('正の整数を入力してください。');
+    return;
+  }
+
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty(PROP_KEYS.SESSION_MIN, String(duration));
+
+  updateTableContent();
+}
+
+/**
+ * 初期値に戻す
+ */
+function resetDurations() {
+  const props = PropertiesService.getDocumentProperties();
+  props.deleteProperty(PROP_KEYS.OVERVIEW_MIN);
+  props.deleteProperty(PROP_KEYS.SESSION_MIN);
+
+  updateTableContent();
+}
+
+/**
+ * テーブル内容を更新
+ */
+function updateTableContent() {
+  const presentation = SlidesApp.getActivePresentation();
+  const slides = presentation.getSlides();
+
+  if (slides.length <= CONFIG.SLIDE_INDEX) {
+    SlidesApp.getUi().alert("指定されたスライドが存在しません。");
+    return;
+  }
+
+  const slide = slides[CONFIG.SLIDE_INDEX];
+  const tables = slide.getTables();
+
+  if (tables.length <= CONFIG.TABLE_INDEX) {
+    SlidesApp.getUi().alert("指定されたテーブルが見つかりません。");
+    return;
+  }
+
+  const table = tables[CONFIG.TABLE_INDEX];
+
+  const durations = getSavedDurations();
+  const ovDur = durations.overviewMin;
+  const ssDur = durations.sessionMin;
+
+  let currentTime = parseTime(CONFIG.START_TIME);
+
+  // 全体説明
+  let endTime = addMinutes(currentTime, ovDur);
+  updateTableCell(table, 0, 1, formatTime(currentTime));
+  updateTableCell(table, 0, 3, formatTime(endTime));
+  currentTime = endTime;
+
+  // 各クール
+  for (let i = 0; i < CONFIG.COOL_COUNT; i++) {
+    endTime = addMinutes(currentTime, ssDur);
+
+    updateTableCell(table, i + 1, 1, formatTime(currentTime));
+    updateTableCell(table, i + 1, 3, formatTime(endTime));
+
+    currentTime = addMinutes(endTime, CONFIG.BREAK_MIN);
+  }
+}
+
+/**
+ * セル更新
+ */
+function updateTableCell(table, row, col, text) {
+  table.getCell(row, col).getText().setText(text);
+}
+
+/**
+ * "9:00" のような文字列をDateに変換
+ */
+function parseTime(timeText) {
+  const [hour, minute] = timeText.split(":").map(Number);
+  return new Date(2000, 0, 1, hour, minute, 0);
+}
+
+/**
+ * 分を加算
+ */
+function addMinutes(time, minsToAdd) {
+  return new Date(time.getTime() + minsToAdd * 60000);
+}
+
+/**
+ * 時刻表示
+ */
+function formatTime(time) {
+  return Utilities.formatDate(time, Session.getScriptTimeZone(), "HH:mm");
+}

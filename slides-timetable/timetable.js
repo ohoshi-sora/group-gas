@@ -2,15 +2,27 @@
  * 全体設定
  */
 const CONFIG = {
+  // 書き込む表の場所。どちらも 0 から数える（SLIDE_INDEX: 1 は2枚目のスライド、TABLE_INDEX: 0 はその中の1つ目の表）
   SLIDE_INDEX: 1,
   TABLE_INDEX: 0,
+
+  // 全体説明の開始時刻（"H:mm"）
   START_TIME: "9:00",
+  // 全体説明の時間（分）の初期値。メニュー「全体説明時間を更新」で入力した値があれば、そちらを使う
   DEFAULT_OVERVIEW_MIN: 40,
+  // 各クールの時間（分）の初期値。メニュー「各クール時間を更新」で入力した値があれば、そちらを使う
   SESSION_MIN: 30,
+  // クールとクールの間の休憩（分）。全体説明と第1クールの間には入れない
   BREAK_MIN: 5,
-  COOL_COUNT: 3
+
+  // クール数。表は1行目が全体説明、2行目から COOL_COUNT 行がクール。group-assign の TOTAL_COOLS と合わせる
+  COOL_COUNT: 3,
+  // 1クールのグループ数。グループ番号は第1クールが 1〜この数、第2クールがその続きになる（7 なら 1~7、8~14…）
+  // group-assign の TEAMS_PER_COHORT と合わせる
+  TEAMS_PER_COHORT: 7
 };
 
+// メニューで入力した時間の保存先（スライドファイルごとに保存される）
 const PROP_KEYS = {
   OVERVIEW_MIN: "overview_min",
   SESSION_MIN: "session_min"
@@ -22,6 +34,7 @@ function onOpen() {
     .addItem('全体説明時間を更新', 'promptUpdateOverviewDuration')
     .addItem('各クール時間を更新', 'promptUpdateSessionDuration')
     .addItem('初期値に戻す', 'resetDurations')
+    .addItem('表を書き直す（CONFIG の変更を反映）', 'updateTableContent')
     .addToUi();
 }
 
@@ -138,11 +151,22 @@ function updateTableContent() {
   for (let i = 0; i < CONFIG.COOL_COUNT; i++) {
     endTime = addMinutes(currentTime, ssDur);
 
+    updateTableCell(table, i + 1, 0, buildCoolLabel(i + 1));
     updateTableCell(table, i + 1, 1, formatTime(currentTime));
     updateTableCell(table, i + 1, 3, formatTime(endTime));
 
     currentTime = addMinutes(endTime, CONFIG.BREAK_MIN);
   }
+}
+
+/**
+ * クール行の1列目の文言（例: "第2クール\nグループ番号：8~14"）
+ * グループ番号は group-assign と同じく、クールごとに TEAMS_PER_COHORT 個ずつの通し番号
+ */
+function buildCoolLabel(coolNo) {
+  const first = (coolNo - 1) * CONFIG.TEAMS_PER_COHORT + 1;
+  const last = coolNo * CONFIG.TEAMS_PER_COHORT;
+  return `第${coolNo}クール\nグループ番号：${first}~${last}`;
 }
 
 /**

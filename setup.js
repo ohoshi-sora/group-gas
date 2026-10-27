@@ -23,6 +23,7 @@ const SETUP = {
     TEAMS_PER_COHORT: 20,   // 1クールのチーム数
     MEMBERS_PER_TEAM: 4,   // 1チームの人数（最大）。1クールの定員 = チーム数 × 人数
     MAIL_DOMAIN: '@example.ac.jp', // パスワードの送信先は「学籍番号 + この値」。必ず変更する
+    NOTIFY_EMAIL: '',      // 自動処理が失敗したときの通知先メールアドレス。空なら通知しない
 
     // 当日申請者の配置先クール。左から優先して空き枠へ入れる（クール数を超える番号は無視される）
     SAME_DAY_SETTINGS: { GENERIC_COOL_PRIORITY: [2, 3, 4] }
@@ -609,11 +610,12 @@ function deepMerge_(base, extra) {
  *  本体の CONFIG のキー・既定値・コメントを変えたときは、ここも同じに直すこと。
  *  直し忘れると、出力したコードを貼り付けたときに、本体側の変更が失われる。
  *************************************************/
-const CONFIG_TEMPLATE_VERSION = 2;
+const CONFIG_TEMPLATE_VERSION = 3;
 
 // 出力順もこの順（ADMIN_SPREADSHEET_ID は、式をそのまま出力する）
 const CONFIG_DEFAULTS = {
   COURSE_NAME: 'YOUR_COURSE_NAME',
+  NOTIFY_EMAIL: '',
   ADMIN_SPREADSHEET_ID: null,
   STUDENT_SPREADSHEET_ID: 'YOUR_STUDENT_SPREADSHEET_ID',
   STUDENT_ROSTER_SHEET_GID: 0,
@@ -694,6 +696,9 @@ const CONFIG_DEFAULTS = {
 // before の '' は空行。
 const CONFIG_NOTES = {
   'COURSE_NAME': { before: ['// メール件名・本文に入る授業名'] },
+  'NOTIFY_EMAIL': {
+    before: ['', '// 自動処理（グループ分け・公開・初期化・フォームの開閉など）が失敗したときの通知先。空なら通知しない']
+  },
   'ADMIN_SPREADSHEET_ID': {
     before: ['', '// ===== スプレッドシート =====', '// 管理用スプレッドシートは、このスクリプトを紐づけたスプレッドシート自身を使うため設定不要'],
     after: '// Form_GAS'

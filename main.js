@@ -5,6 +5,9 @@ const CONFIG = {
   // メール件名・本文に入る授業名
   COURSE_NAME: 'YOUR_COURSE_NAME',
 
+  // 自動処理（グループ分け・公開・初期化・フォームの開閉など）が失敗したときの通知先。空なら通知しない
+  NOTIFY_EMAIL: '',
+
   // ===== スプレッドシート =====
   // 管理用スプレッドシートは、このスクリプトを紐づけたスプレッドシート自身を使うため設定不要
   ADMIN_SPREADSHEET_ID: SpreadsheetApp.getActive().getId(), // Form_GAS
@@ -941,7 +944,7 @@ function sendInitialPasswordsScheduled() {
   try {
     stats = sendInitialPasswordsBatch_(resolveInitialPwCount_(index));
   } catch (e) {
-    Logger.log('⚠️ 初回パスワード送信でエラー: ' + e);
+    notifyFailure_('初回パスワード送信でエラー', e);
   }
 
   const remaining = countInitialPwRemaining_();
@@ -960,7 +963,10 @@ function sendInitialPasswordsScheduled() {
   } else {
     prop.deleteProperty(PROP_KEYS.INITIAL_PW_SCHEDULE_INDEX);
     if (remaining > 0) {
-      Logger.log(`⚠️ 初回パスワード: SEND_SCHEDULE を使い切りましたが未送信が ${remaining} 名残っています。日程を追加して「分割送信を開始」を再実行してください。`);
+      notifyFailure_(
+        '初回パスワードの未送信が残っています',
+        `SEND_SCHEDULE を使い切りましたが未送信が ${remaining} 名残っています。日程を追加して「分割送信を開始」を再実行してください。`
+      );
     } else {
       Logger.log('✅ 初回パスワードの分割送信がすべて完了しました。');
     }
@@ -1277,8 +1283,9 @@ function distributeByPreference() {
     const cTs = validHeader.indexOf(CONFIG.HEADERS.TS);
     const cId = validHeader.indexOf(CONFIG.HEADERS.ID);
     const cPref = validHeader.indexOf(CONFIG.HEADERS.PREF);
+    const cStatus = validHeader.indexOf('ステータス');
 
-    if (validValues.length > 1 && (cTs < 0 || cId < 0 || cPref < 0)) {
+    if (validValues.length > 1 && (cTs < 0 || cId < 0 || cPref < 0 || cStatus < 0)) {
       throw new Error('有効申請シートの見出しが不足しています。');
     }
 
@@ -1290,8 +1297,7 @@ function distributeByPreference() {
 
       const ts = toTime_(row[cTs]);
       const pref = String(row[cPref] || '').trim();
-      // 10列目はステータス（Index 9）
-      const status = String(row[9] || '').trim();
+      const status = String(row[cStatus] || '').trim();
 
       const prev = latestValid.get(id);
       if (!prev || ts > prev.ts) {
@@ -1382,7 +1388,7 @@ function distributeByPreference() {
 
     // ステータスを「処理済み」に更新
     if (validValues.length > 1) {
-      validSheet.getRange(2, 10, validValues.length - 1, 1).setValue('処理済み');
+      validSheet.getRange(2, cStatus + 1, validValues.length - 1, 1).setValue('処理済み');
     }
     SpreadsheetApp.flush(); // ステータスの更新を確実に反映させる
   } finally {
@@ -1497,7 +1503,7 @@ function makeRandomGroupsTriggerSafe() {
   try {
     autoScheduleNextWeek_(PROP_KEYS.MAKE_RANDOM_GROUPS_AT, scheduleMakeRandomGroupsAt, 'makeRandomGroups');
   } catch (e) {
-    Logger.log('⚠️ makeRandomGroups 翌週トリガーの自動予約に失敗: ' + e);
+    notifyFailure_('グループ分けの翌週トリガーの自動予約に失敗', e);
   }
   makeRandomGroups();
 }
@@ -1523,7 +1529,8 @@ function makeRandomGroups() {
     try {
       SpreadsheetApp.getUi().alert('グループ分けでエラーが発生しました\n' + e);
     } catch (_) {
-      // トリガー実行時は getUi() が使えないため、ログのみ
+      // トリガー実行時は getUi() が使えないため、メールで知らせる
+      notifyFailure_('グループ分けでエラーが発生しました', e);
     }
   }
 }
@@ -1658,7 +1665,7 @@ function publishGroupsNowTriggerSafe() {
     autoScheduleNextWeek_(PROP_KEYS.GROUP_PUBLISH_AT, scheduleGroupPublishAt);
     Logger.log('✅ グループ分けを公開し、翌週分を予約しました。');
   } catch (e) {
-    Logger.log('⚠️ グループ公開に失敗: ' + e);
+    notifyFailure_('グループ公開に失敗', e);
   }
 }
 
@@ -1971,25 +1978,25 @@ function openCoolFormTriggerSafe() {
   try {
     getCoolForm_().setAcceptingResponses(true);
     autoScheduleNextWeek_(PROP_KEYS.COOL_OPEN_AT, scheduleCoolFormOpenAt);
-  } catch (e) { Logger.log(e); }
+  } catch (e) { notifyFailure_('クール申請フォームの受付開始に失敗', e); }
 }
 function closeCoolFormTriggerSafe() {
   try {
     getCoolForm_().setAcceptingResponses(false);
     autoScheduleNextWeek_(PROP_KEYS.COOL_CLOSE_AT, scheduleCoolFormCloseAt);
-  } catch (e) { Logger.log(e); }
+  } catch (e) { notifyFailure_('クール申請フォームの締切に失敗', e); }
 }
 function openPasswordFormTriggerSafe() {
   try {
     getPasswordForm_().setAcceptingResponses(true);
     autoScheduleNextWeek_(PROP_KEYS.PASS_OPEN_AT, schedulePasswordFormOpenAt);
-  } catch (e) { Logger.log(e); }
+  } catch (e) { notifyFailure_('パスワードフォームの受付開始に失敗', e); }
 }
 function closePasswordFormTriggerSafe() {
   try {
     getPasswordForm_().setAcceptingResponses(false);
     autoScheduleNextWeek_(PROP_KEYS.PASS_CLOSE_AT, schedulePasswordFormCloseAt);
-  } catch (e) { Logger.log(e); }
+  } catch (e) { notifyFailure_('パスワードフォームの締切に失敗', e); }
 }
 
 function scheduleCoolFormOpenAt(date) {
@@ -2287,7 +2294,7 @@ function resetAllDataSafe() {
   try {
     autoScheduleNextWeek_(PROP_KEYS.RESET_AT, scheduleResetAt_, 'reset');
   } catch (e) {
-    Logger.log('⚠️ 翌週トリガーの自動予約に失敗しました（データ初期化は続行）: ' + e);
+    notifyFailure_('初期化の翌週トリガーの自動予約に失敗（データ初期化は続行）', e);
   }
 
   resetAllDataCore_();
@@ -2316,7 +2323,7 @@ function resetAllDataCore_() {
 
     Logger.log('✅ クール申請関連データの初期化が完了しました。');
   } catch (e) {
-    Logger.log('⚠️ 初期化中にエラーが発生: ' + e);
+    notifyFailure_('初期化中にエラーが発生', e);
   }
 }
 
@@ -2325,7 +2332,7 @@ function deleteCoolFormResponsesOnly_() {
     getCoolForm_().deleteAllResponses();
     Logger.log('クール申請フォーム本体の回答を削除しました。');
   } catch (e) {
-    Logger.log('⚠️ クール申請フォーム本体の回答削除に失敗: ' + e);
+    notifyFailure_('クール申請フォーム本体の回答削除に失敗', e);
   }
 }
 
@@ -2503,6 +2510,26 @@ function clearKeepHeader_(sheet) {
 
 function clearSheet_(sheet) {
   sheet.clear();
+}
+
+// トリガーで動く処理の失敗を CONFIG.NOTIFY_EMAIL へ知らせる。
+// catch してログに書くだけだと GAS 標準の失敗メールも届かないため、ここで送る。
+function notifyFailure_(title, err) {
+  Logger.log(`⚠️ ${title}: ${err}`);
+  const to = String(CONFIG.NOTIFY_EMAIL || '').trim();
+  if (!to) return;
+
+  try {
+    const url = SpreadsheetApp.openById(CONFIG.ADMIN_SPREADSHEET_ID).getUrl();
+    MailApp.sendEmail(
+      to,
+      `[${CONFIG.COURSE_NAME}] 自動処理の失敗: ${title}`,
+      `${title}\n\n${err}\n\n発生日時：${formatJST_(new Date())}\n管理用スプレッドシート：${url}\n` +
+      '詳しいログは、Apps Script の「実行数」で確認できます。'
+    );
+  } catch (e) {
+    Logger.log('⚠️ 失敗通知メールの送信に失敗: ' + e);
+  }
 }
 
 

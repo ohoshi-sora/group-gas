@@ -182,6 +182,21 @@ const INVALID_HEADERS = [
   '備考'
 ];
 
+// 学生共有用「クール分け」の再度申請欄の右に出す理由
+const REAPPLY_REASON_HEADER = '理由';
+const REAPPLY_REASONS = {
+  FULL: '定員超過',
+  WRONG_PASSWORD: 'パスワード誤り',
+  CANNOT_REAPPLY: '再度申請できません'
+};
+// 無効申請シートの「無効理由」→ 学生に見せる理由
+const INVALID_TO_REAPPLY_REASON = {
+  'パスワード不一致': REAPPLY_REASONS.WRONG_PASSWORD,
+  'パスワードが無効です': REAPPLY_REASONS.CANNOT_REAPPLY,
+  '未発行の学籍番号です': REAPPLY_REASONS.CANNOT_REAPPLY,
+  '必須項目不足': REAPPLY_REASONS.CANNOT_REAPPLY
+};
+
 const PASSWORD_LOG_HEADERS = [
   CONFIG.HEADERS.TS,
   CONFIG.HEADERS.ID,
@@ -1287,6 +1302,7 @@ function distributeByPreference() {
     const coolBuckets = Array.from({ length: CONFIG.TOTAL_COOLS }, () => []);
     const bc = [];
     const reapplySet = new Set();
+    const reapplyReason = new Map();
 
     const currentRoster = buildCurrentBuckets_();
     const alreadyReapply = new Set(currentRoster.reapply);
@@ -1300,7 +1316,9 @@ function distributeByPreference() {
         if (s === normalizePref_(CONFIG.PREF_VALUE.BC)) {
           bc.push(id);
         } else {
+          // クール希望で再度申請に残っているのは、定員超過で入った人
           reapplySet.add(id);
+          reapplyReason.set(id, REAPPLY_REASONS.FULL);
         }
         continue;
       }
@@ -1318,7 +1336,10 @@ function distributeByPreference() {
     const take = (arr) => {
       const main = arr.slice(0, capacityPerCool);
       const extra = arr.slice(capacityPerCool);
-      for (const id of extra) reapplySet.add(id);
+      for (const id of extra) {
+        reapplySet.add(id);
+        reapplyReason.set(id, REAPPLY_REASONS.FULL);
+      }
       return main;
     };
 
@@ -1329,6 +1350,7 @@ function distributeByPreference() {
     if (invalidValues.length > 1) {
       const invalidHeader = invalidValues[0].map(String);
       const icId = invalidHeader.indexOf(CONFIG.HEADERS.ID);
+      const icReason = invalidHeader.indexOf('無効理由');
       if (icId >= 0) {
         for (let r = 1; r < invalidValues.length; r++) {
           const id = normalizeStudentId_(invalidValues[r][icId]);
@@ -1338,6 +1360,9 @@ function distributeByPreference() {
           if (latestValid.has(id)) continue;
 
           reapplySet.add(id);
+          // 行は時系列順なので、後の行で上書きして最新の無効理由を使う
+          const invalidReason = icReason >= 0 ? String(invalidValues[r][icReason] || '').trim() : '';
+          reapplyReason.set(id, INVALID_TO_REAPPLY_REASON[invalidReason] || '');
         }
       }
     }
@@ -1350,7 +1375,9 @@ function distributeByPreference() {
     }
     const filteredBC = bc.filter(id => !reapplyLookup.has(id));
 
-    writeRoster_(rosterSheet, ...coolBuckets, filteredBC, reapply);
+    const reasons = reapply.map(id => reapplyReason.get(id) || '');
+
+    writeRoster_(rosterSheet, ...coolBuckets, filteredBC, reapply, reasons);
     SpreadsheetApp.flush(); // 名簿の更新を確実に反映させる
 
     // ステータスを「処理済み」に更新
@@ -1544,14 +1571,21 @@ function runMakeRandomGroupsCore_() {
   const probs = [];
 
   for (let i = 0; i < activeLists.length; i++) {
-    if (activeLists[i].length && Ts[i] === 0) {
-      probs.push(`${coolLabel_(i + 1)}: ${activeLists[i].length} 名 → 3/4人のみで編成不可`);
+    const n = activeLists[i].length;
+    if (!n || Ts[i] > 0) continue;
+    if (n <= 5) {
+      // 1・2・5人は3/4人に分けられないが、止めずに全員を1グループにまとめる
+      Logger.log(`⚠️ ${coolLabel_(i + 1)}: ${n} 名は3/4人に分けられないため、1グループにまとめます。`);
+    } else {
+      probs.push(`${coolLabel_(i + 1)}: ${n} 名 → 3/4人のみで編成不可`);
     }
   }
   if (probs.length) throw new Error(probs.join(' | '));
 
   const gs = activeLists.map((list, i) => {
-    const groups = splitTeams34Strict_(shuffleCopy_(list), Ts[i], coolLabel_(i + 1));
+    const groups = (list.length && Ts[i] === 0)
+      ? splitIntoOneGroup_(shuffleCopy_(list))
+      : splitTeams34Strict_(shuffleCopy_(list), Ts[i], coolLabel_(i + 1));
     // 常に最大チーム数（CONFIG.TEAMS_PER_COHORT）まで空のグループを追加して枠を確保
     for (let gNo = groups.length + 1; gNo <= CONFIG.TEAMS_PER_COHORT; gNo++) {
       groups.push({ no: gNo, members: [] });
@@ -2306,12 +2340,13 @@ function writeRoster_(sheet, ...cols) {
   const col4 = (CONFIG.TOTAL_COOLS >= 4) ? (cols[3] || []) : [];
   const colBC = cols[CONFIG.TOTAL_COOLS] || [];
   const colReapply = cols[CONFIG.TOTAL_COOLS + 1] || [];
+  const colReason = cols[CONFIG.TOTAL_COOLS + 2] || [];
 
   sheet.clear();
 
   const headers = (CONFIG.TOTAL_COOLS >= 4)
-    ? [coolLabel_(1), coolLabel_(2), coolLabel_(3), coolLabel_(4), CONFIG.LABELS.BC, CONFIG.LABELS.REAPPLY]
-    : [coolLabel_(1), coolLabel_(2), coolLabel_(3), CONFIG.LABELS.BC, CONFIG.LABELS.REAPPLY];
+    ? [coolLabel_(1), coolLabel_(2), coolLabel_(3), coolLabel_(4), CONFIG.LABELS.BC, CONFIG.LABELS.REAPPLY, REAPPLY_REASON_HEADER]
+    : [coolLabel_(1), coolLabel_(2), coolLabel_(3), CONFIG.LABELS.BC, CONFIG.LABELS.REAPPLY, REAPPLY_REASON_HEADER];
 
   sheet.getRange(1, 1, 1, headers.length)
     .setValues([headers])
@@ -2327,6 +2362,7 @@ function writeRoster_(sheet, ...cols) {
   const reapplyCol = bcCol + 1;
   pasteColumn_(sheet, 2, bcCol, colBC);
   pasteColumn_(sheet, 2, reapplyCol, colReapply);
+  pasteColumn_(sheet, 2, reapplyCol + 1, colReason);
 
   sheet.setColumnWidths(1, headers.length, 100);
 
@@ -3346,6 +3382,11 @@ function splitTeams34Strict_(ids, T, labelForUi) {
     groups.push({ no: g + 1, members });
   }
   return groups;
+}
+
+// 3/4人に分けられない1・2・5人用。全員を1グループにまとめる（例: 2人 -> 2、5人 -> 5）。
+function splitIntoOneGroup_(ids) {
+  return [{ no: 1, members: ids.slice() }];
 }
 
 function flattenPairs_(groups, offset) {

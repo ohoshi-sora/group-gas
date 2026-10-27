@@ -497,7 +497,7 @@ function createStudentSheets_(ss, rosterSheetId, totalCools) {
   const roster = ss.getSheets().find(s => s.getSheetId() === rosterSheetId);
   const rosterHeaders = [];
   for (let n = 1; n <= totalCools; n++) rosterHeaders.push(`第${n}クール`);
-  rosterHeaders.push(L.BC, L.REAPPLY);
+  rosterHeaders.push(L.BC, L.REAPPLY, '理由');
   roster.getRange(1, 1, 1, rosterHeaders.length)
     .setValues([rosterHeaders])
     .setFontWeight('bold')
